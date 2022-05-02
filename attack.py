@@ -194,24 +194,24 @@ def square_attack_l2(model, x, y, corr_classified, eps, n_iters, p_init, metrics
 
 
 '''model, shape of the image, correct class, epsilon, iterations, initial_p, metrics_path, target_class/target_mdoel, loss type'''
-def square_attack_linf(model, x, y, corr_classified, eps, n_iters, p_init, metrics_path, targeted, loss_type= "margin_loss"):
+def square_attack_linf(model, x, y, eps, n_iters, p_init,  targeted, loss_type= "margin_loss"):
     """ The Linf square attack """
     np.random.seed(0)  # important to leave it here as well
     min_val, max_val = 0, 1 if x.max() <= 1 else 255
     c, h, w = x.shape[1:]
     n_features = c*h*w
     n_ex_total = x.shape[0]
-    #get confidence 
-    x, y = x[corr_classified], y[corr_classified]
-
+    cnt = 0
+    path = './convert_process/Image.' + str(cnt)+'.jpg'
     # [c, 1, w], i.e. vertical stripes work best for untargeted attacks
     init_delta = np.random.choice([-eps, eps], size=[x.shape[0], c, 1, w])
     x_best = np.clip(x + init_delta, min_val, max_val)
-    logits = model.predict(x_best)
+    logits = model.predict(utils.convert_to_image(x_best[0],path=path))
+    cnt += 1
+    path = './convert_process/Image.' + str(cnt)+'.jpg'
     loss_min = model.loss(y, logits, targeted, loss_type=loss_type)
     margin_min = model.loss(y, logits, targeted, loss_type='margin_loss')
     n_queries = np.ones(x.shape[0])  # ones because we have already used 1 query
-
     time_start = time.time()
     metrics = np.zeros([n_iters, 7])
     for i_iter in range(n_iters - 1):
@@ -219,7 +219,6 @@ def square_attack_linf(model, x, y, corr_classified, eps, n_iters, p_init, metri
         x_curr, x_best_curr, y_curr = x[idx_to_fool], x_best[idx_to_fool], y[idx_to_fool]
         loss_min_curr, margin_min_curr = loss_min[idx_to_fool], margin_min[idx_to_fool]
         deltas = x_best_curr - x_curr
-
         p = p_selection(p_init, i_iter, n_iters)
         for i_img in range(x_best_curr.shape[0]):
             s = int(round(np.sqrt(p * n_features / c)))
@@ -234,8 +233,11 @@ def square_attack_linf(model, x, y, corr_classified, eps, n_iters, p_init, metri
                 deltas[i_img, :, center_h:center_h+s, center_w:center_w+s] = np.random.choice([-eps, eps], size=[c, 1, 1])
 
         x_new = np.clip(x_curr + deltas, min_val, max_val)
-
-        logits = model.predict(x_new)
+        time.sleep(0.5)
+        logits = model.predict(utils.convert_to_image(x_new[0],path=path))
+        cnt += 1
+        path = './convert_process/Image.' + str(cnt)+'.jpg'
+        
         loss = model.loss(y_curr, logits, targeted, loss_type=loss_type)
         margin = model.loss(y_curr, logits, targeted, loss_type='margin_loss')
 
@@ -255,12 +257,10 @@ def square_attack_linf(model, x, y, corr_classified, eps, n_iters, p_init, metri
             format(i_iter+1, acc, acc_corr, mean_nq_ae, median_nq_ae, avg_margin_min, x.shape[0], eps, time_total))
 
         metrics[i_iter] = [acc, acc_corr, mean_nq, mean_nq_ae, median_nq_ae, margin_min.mean(), time_total]
-        if (i_iter <= 500 and i_iter % 20 == 0) or (i_iter > 100 and i_iter % 50 == 0) or i_iter + 1 == n_iters or acc == 0:
-            np.save(metrics_path, metrics)
         if acc == 0:
             break
 
-    return n_queries, x_best
+    return n_queries,x_best
 
 
     

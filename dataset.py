@@ -14,17 +14,15 @@ class dataset(data.Dataset):
         imgs = [os.path.join(root,image) for image in os.listdir(root)]
         self.imgs = imgs
         self.transform = T.Compose([T.CenterCrop([400,400]),T.ToTensor()])
-        
 
     def __getitem__(self, index):
         """
         一次返回一张图片的数据
         """
         img_path = self.imgs[index]
-        label = self.imgs[index].split('.')[-2]
         data = Image.open(img_path)
         data = self.transform(data)
-        return data, label
+        return data,0
     
 
     def __len__(self):

@@ -2,6 +2,9 @@
 import sys
 import json
 import base64
+import numpy as np
+import utils
+import torch as t
 
 from urllib.request import urlopen
 from urllib.request import Request
@@ -76,36 +79,52 @@ def read_file(image_path):
 def request(url, data):
     req = Request(url, data.encode('utf-8'))
     has_error = False
-    try:
-        f = urlopen(req)
-        result_str = f.read()
-        result_str = result_str.decode()
-        return result_str
-    except  URLError as err:
-        print(err)
+    f = urlopen(req)
+    result_str = f.read()
+    result_str = result_str.decode()
+    return result_str
 
 class baidu_model:
+    def __init__(self):
+        self.classes = dict()
+    
     def predict(self,filename,use_path = True):
-        # 获取图片
+        
         token = fetch_token()
         url = IMAGE_RECOGNIZE_URL + "?access_token=" + token
-        #print(filename)
         file_content = read_file(filename) if use_path else filename
-        
         response = request(url, urlencode(
             {
                 'image': base64.b64encode(file_content),
                 'top_num': 10
             }))
         result_json = json.loads(response)
-        #print(result_json['result'],result_json['result_num'],result_json.items())
-        #logits = [couple for couple in result_json]
-        result = [couple['score'] for couple in result_json['result'] ]
-        return result
+        #print(result_json)
+        for couple in result_json['result']:
+            self.classes.update({couple['name']:couple['score']})
+        logits = np.array( [list(self.classes.values())[:10]])
+        print(result_json['result'][:3])
+        return logits
+       
+
     
+    def loss(self, y, logits, targeted=False, loss_type='margin_loss'):
+        if loss_type == 'margin_loss':
+            preds_correct_class = (logits * y).sum(1, keepdims=True)
+            diff = preds_correct_class - logits  # difference between the correct class and all other classes
+            diff[y] = np.inf  # to exclude zeros coming from f_correct - f_correct
+            margin = diff.min(1, keepdims=True)
+            loss = margin * -1 if targeted else margin
+        elif loss_type == 'cross_entropy':
+            probs = utils.softmax(logits)
+            loss = -np.log(probs[y])
+            loss = loss * -1 if not targeted else loss
+        return loss.flatten()
+
+  
 if __name__ == "__main__":
     bdm = baidu_model()
-    r = bdm.predict('./data/food6.葡萄.jpg')
-    print(r)
+    r = bdm.predict('data/food6.葡萄.jpg')
+    print(utils.dense_to_onehot([3],10))
 
 
