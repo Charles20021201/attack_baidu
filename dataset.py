@@ -13,7 +13,7 @@ class dataset(data.Dataset):
         '''
         imgs = [os.path.join(root,image) for image in os.listdir(root)]
         self.imgs = imgs
-        self.transform = T.Compose([T.CenterCrop([400,400]),T.ToTensor()])
+        self.transform = T.Compose([T.CenterCrop([1200,1000]),T.ToTensor()])
 
     def __getitem__(self, index):
         """

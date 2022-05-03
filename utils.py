@@ -43,8 +43,6 @@ def softmax(x):
     return e_x / e_x.sum(axis=1, keepdims=True)
 
 
-
- 
 def convert_to_image(img_tensor,path = None):
     """
     param img_tensor: tensor

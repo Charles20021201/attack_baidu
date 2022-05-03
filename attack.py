@@ -70,9 +70,10 @@ def meta_pseudo_gaussian_pert(s):
     return delta
 
 
-def square_attack_l2(model, x, y, eps, n_iters, p_init, targeted, loss_type = "margin_loss"):
+def square_attack_l2(model, x, y, eps, n_iters, p_init, targeted,target_part, target_class = 'fruits',loss_type = "margin_loss"):
     """ The L2 square attack """
     np.random.seed(0)
+    sleep_time = 0.5 if target_class == 'face' else 0.02
     cnt =0
     path = './convert_process/Image.'+str(cnt)+'.jpg'
     min_val, max_val = 0, 1
@@ -92,7 +93,7 @@ def square_attack_l2(model, x, y, eps, n_iters, p_init, targeted, loss_type = "m
             center_w += s
         center_h += s
     x_best = np.clip(x + delta_init / np.sqrt(np.sum(delta_init ** 2, axis=(1, 2, 3), keepdims=True)) * eps, 0, 1)  
-    logits = model.predict(utils.convert_to_image(x_best[0],path = path))
+    logits = model.predict(utils.convert_to_image(x_best[0],path = path),target_class = target_class,target_part = target_part)
     cnt += 1
     path = './convert_process/Image.'+str(cnt)+'.jpg' 
     loss_min = model.loss(y, logits, targeted, loss_type=loss_type)
@@ -148,8 +149,8 @@ def square_attack_l2(model, x, y, eps, n_iters, p_init, targeted, loss_type = "m
         x_new = x_curr + delta_curr / np.sqrt(np.sum(delta_curr ** 2, axis=(1, 2, 3), keepdims=True)) * eps
         x_new = np.clip(x_new, min_val, max_val)
         curr_norms_image = np.sqrt(np.sum((x_new - x_curr) ** 2, axis=(1, 2, 3), keepdims=True))
-        time.sleep(0.02)
-        logits = model.predict(utils.convert_to_image(x_new[0],path = path))
+        time.sleep(sleep_time)
+        logits = model.predict(utils.convert_to_image(x_new[0],path = path),target_class = target_class,target_part =target_part)
         cnt += 1
         path = './convert_process/Image.'+str(cnt)+'.jpg'
         loss = model.loss(y_curr, logits, targeted, loss_type=loss_type)
@@ -164,6 +165,7 @@ def square_attack_l2(model, x, y, eps, n_iters, p_init, targeted, loss_type = "m
         n_queries[idx_to_fool] += 1
         print('query_num = {},margin_loss = {:.3f}, targte_loss = {:.3f}'.format(n_queries[0],margin_min[0],loss_min[0]))
         if margin_min < 0.0:
+            utils.convert_to_image(x_best[0],path = "result.jpg")
             break
     curr_norms_image = np.sqrt(np.sum((x_best - x) ** 2, axis=(1, 2, 3), keepdims=True))
     print('Maximal norm of the perturbations: {:.5f}'.format(np.amax(curr_norms_image)))
@@ -171,9 +173,10 @@ def square_attack_l2(model, x, y, eps, n_iters, p_init, targeted, loss_type = "m
 
 
 '''model, shape of the image, correct class, epsilon, iterations, initial_p, metrics_path, target_class/target_mdoel, loss type'''
-def square_attack_linf(model, x, y, eps, n_iters, p_init,  targeted, loss_type= "margin_loss"):
+def square_attack_linf(model, x, y, eps, n_iters, p_init,  targeted, target_part,target_class = 'fruits',loss_type= "margin_loss",):
     """ The Linf square attack """
     np.random.seed(0)  # important to leave it here as well
+    sleep_time = 0.5 if target_class == 'face' else 0.02
     min_val, max_val = 0, 1 if x.max() <= 1 else 255
     c, h, w = x.shape[1:]
     n_features = c*h*w
@@ -183,8 +186,7 @@ def square_attack_linf(model, x, y, eps, n_iters, p_init,  targeted, loss_type= 
     init_delta = np.random.choice([-eps, eps], size=[x.shape[0], c, 1, w])
     x_best = np.clip(x + init_delta, min_val, max_val)
     cnt += 1
-    logits = model.predict(utils.convert_to_image(x_best[0],path=path))
-    
+    logits = model.predict(utils.convert_to_image(x_best[0],path=path),target_class = target_class,target_part = target_part)
     path = './convert_process/Image.' + str(cnt)+'.jpg'
     loss_min = model.loss(y, logits, targeted, loss_type=loss_type)
     margin_min = model.loss(y, logits, targeted, loss_type='margin_loss')
@@ -210,25 +212,23 @@ def square_attack_linf(model, x, y, eps, n_iters, p_init,  targeted, loss_type= 
                 deltas[i_img, :, center_h:center_h+s, center_w:center_w+s] = np.random.choice([-eps, eps], size=[c, 1, 1])
 
         x_new = np.clip(x_curr + deltas, min_val, max_val)
-        time.sleep(0.3)
-        logits = model.predict(utils.convert_to_image(x_new[0],path=path))
+        time.sleep(sleep_time)
+        logits = model.predict(utils.convert_to_image(x_new[0],path=path),target_class = target_class,target_part = target_part)
         cnt += 1
         path = './convert_process/Image.' + str(cnt)+'.jpg'
-        
         loss = model.loss(y_curr, logits, targeted, loss_type=loss_type)
         margin = model.loss(y_curr, logits, targeted, loss_type='margin_loss')
-        
         idx_improved = loss < loss_min_curr
         loss_min[idx_to_fool] = idx_improved * loss + ~idx_improved * loss_min_curr
         margin_min[idx_to_fool] = idx_improved * margin + ~idx_improved * margin_min_curr
-        
-        idx_improved = np.reshape(idx_improved, [-1, *[1]*len(x.shape[:-1])])
-        
+        idx_improved = np.reshape(idx_improved, [-1, *[1]*len(x.shape[:-1])]) 
         x_best[idx_to_fool] = idx_improved * x_new + ~idx_improved * x_best_curr
         n_queries[idx_to_fool] += 1
         print("query_num = {},margin_loss = {:.3f}, \
               targte_loss = {:.3f}".format(n_queries[0],margin_min[0],loss_min[0]))
         if margin_min < 0.0:
+            
+            utils.convert_to_image(x_best[0],path = "result.jpg")
             break
     return n_queries,x_best
 

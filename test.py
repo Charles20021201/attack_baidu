@@ -76,7 +76,14 @@ def get_result(filename):
     time.sleep(0.5)
     print ( list(response.json()['result'])[:3])
 if __name__ == '__main__':
-    f1 = 'source.jpg'
-    f2 = './convert_process/Image.315.jpg'
-    for f in (f1,f2):
-        get_result(f)
+    import matplotlib.pyplot as plt
+    fig = plt.figure()
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.set(xlim=[0.5, 4.5], ylim=[-2, 8], title='An Example Axes',
+       ylabel='Y-Axis', xlabel='X-Axis')
+    fig = plt.figure()
+    ax1 = fig.add_subplot(221)
+    ax2 = fig.add_subplot(222)
+    ax3 = fig.add_subplot(224)
+    plt.show()
